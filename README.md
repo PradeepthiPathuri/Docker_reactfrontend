@@ -10,17 +10,17 @@ Cross-Platform Support: Compatible with iOS and macOS devices.
 Lightweight & Minimalistic Design: Focuses on simplicity and usability.
 
 ## Installation
-Clone the repository:
+#### Clone the repository:
 
 `git clone https://github.com/Avinash-006/swift-share.git`
 
-Open the project in VSCode
+#### Open the project in VSCode
 
-Install Dependencies:
+#### Install Dependencies:
 
 `npm install`
 
-Run the Project:
+#### Run the Project:
 
 `npm run dev`
 

@@ -12,17 +12,17 @@ Lightweight & Minimalistic Design: Focuses on simplicity and usability.
 ## Installation
 #### Clone the repository:
 
-`git clone https://github.com/Avinash-006/swift-share.git`
+```git clone https://github.com/Avinash-006/swift-share.git```
 
 #### Open the project in VSCode
 
 #### Install Dependencies:
 
-`npm install`
+```npm install```
 
 #### Run the Project:
 
-`npm run dev`
+```npm run dev```
 
 ## Usage
 Launch the app on both devices you want to connect.

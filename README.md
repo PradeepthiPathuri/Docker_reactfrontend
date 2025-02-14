@@ -1,5 +1,5 @@
 # SwiftShare
-Swift Share is a lightweight and efficient file-sharing app built using Swift. It allows users to quickly and securely share files between devices over a local network or internet connection. Swift Share focuses on providing an easy-to-use interface with fast transfer speeds and robust security, making it ideal for anyone looking to send documents, images, videos, or any other types of files with ease.
+🚀Swift Share is a lightweight and efficient file-sharing app built using Swift. It allows users to quickly and securely share files between devices over a local network or internet connection. Swift Share focuses on providing an easy-to-use interface with fast transfer speeds and robust security, making it ideal for anyone looking to send documents, images, videos, or any other types of files with ease.🚀📩
 
 ## Features
 Local and Remote File Sharing: Share files with devices on the same local network or over the internet.

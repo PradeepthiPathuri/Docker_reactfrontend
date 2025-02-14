@@ -11,14 +11,17 @@ Lightweight & Minimalistic Design: Focuses on simplicity and usability.
 
 ## Installation
 Clone the repository:
+
 `git clone https://github.com/yourusername/swift-share.git`
 
 Open the project in VSCode
 
 Install Dependencies:
+
 `npm install`
 
 Run the Project:
+
 `npm run dev`
 
 ## Usage

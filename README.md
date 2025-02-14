@@ -11,13 +11,16 @@ Lightweight & Minimalistic Design: Focuses on simplicity and usability.
 
 ## Installation
 Clone the repository:
-
 `git clone https://github.com/yourusername/swift-share.git`
+
 Open the project in VSCode
+
 Install Dependencies:
 `npm install`
+
 Run the Project:
 `npm run dev`
+
 ## Usage
 Launch the app on both devices you want to connect.
 On the sending device, select the file(s) to share and click "Send."

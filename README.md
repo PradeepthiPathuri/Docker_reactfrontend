@@ -12,9 +12,7 @@ Lightweight & Minimalistic Design: Focuses on simplicity and usability.
 Installation
 Clone the repository:
 
-bash
-Copy
-git clone https://github.com/yourusername/swift-share.git
+`git clone https://github.com/yourusername/swift-share.git`
 Open the project in Xcode:
 
 arduino

@@ -38,7 +38,7 @@ function App() {
 
   return (
     <Router>
-      <div className={`min-h-screen ${currentTheme.background}`}>
+     <div className={`min-h-screen ${currentTheme.background} flex flex-col`}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route
@@ -46,7 +46,7 @@ function App() {
             element={
               <>
                 <Navbar />
-                <main className="px-4">
+                <main className="flex-1 px-4 container mx-auto">
                   <Routes>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/login" element={<Login />} />

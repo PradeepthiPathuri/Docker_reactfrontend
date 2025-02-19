@@ -38,15 +38,15 @@ function App() {
 
   return (
     <Router>
-     <div className={`min-h-screen ${currentTheme.background} flex flex-col`}>
+      <div className={`min-h-screen ${currentTheme.background} flex flex-col`}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route
             path="/*"
             element={
-              <>
+              <div className="flex flex-col h-screen overflow-hidden">
                 <Navbar />
-                <main className="flex-1 px-4 container mx-auto">
+                <main className="flex-1 overflow-auto px-4 container mx-auto py-2">
                   <Routes>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/login" element={<Login />} />
@@ -61,7 +61,7 @@ function App() {
                     <Route path="/settings" element={<Settings setTheme={setTheme} theme={theme} />} />
                   </Routes>
                 </main>
-              </>
+              </div>
             }
           />
         </Routes>

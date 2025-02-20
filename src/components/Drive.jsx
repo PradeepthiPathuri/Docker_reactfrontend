@@ -82,7 +82,7 @@ export const Drive = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-[calc(100vh-8rem)] mt-8 bg-[#0A0A0A] rounded-lg overflow-hidden"
+      className="flex h-[calc(100vh-8rem)] mt-20 bg-[#0A0A0A] rounded-lg overflow-hidden"
     >
       {/* Sidebar */}
       <div className="w-64 bg-white/5 backdrop-blur-lg border-r border-white/10 p-4">

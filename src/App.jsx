@@ -48,6 +48,7 @@ function App() {
                 <Navbar />
                 <main className="flex-1 overflow-auto px-4 container mx-auto py-2">
                   <Routes>
+                    {/* Added Routes */}
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />

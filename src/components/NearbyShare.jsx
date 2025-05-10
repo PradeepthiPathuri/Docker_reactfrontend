@@ -10,7 +10,7 @@ export const NearbyShare = () => {
 
   const startScanning = () => {
     setIsScanning(true);
-    // Simulate finding devices
+
     setTimeout(() => {
       setDevices([
         { id: 1, name: "John's MacBook", type: "laptop" },

@@ -90,14 +90,7 @@ export const LandingPage = () => {
             >
               Get Started
             </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/pass-share')}
-              className="px-8 py-3 bg-white/10 rounded-full font-medium text-lg hover:bg-white/20 transition-all duration-300"
-            >
-              Try Now
-            </motion.button>
+          
           </motion.div>
         </div>
 

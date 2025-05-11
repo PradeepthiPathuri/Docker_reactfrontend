@@ -6,6 +6,7 @@ import { AdminNavbar } from './AdminNavbar';
 import { AuthContext } from '../../AuthContext';
 import { Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import config from '../../config';
 
 export const ViewAllUsers = () => {
   const { user } = useContext(AuthContext);
@@ -22,10 +23,12 @@ export const ViewAllUsers = () => {
 
     const fetchUsers = async () => {
       try {
-        const response = await axios.get('springbackend-production-93ac.up.railway.app:8080/api/users/viewall');
+        const response = await axios.get(`${config.url}/api/users/viewall`, {
+          withCredentials: true,
+        });
         setUsers(response.data);
       } catch (error) {
-        toast.error('Failed to fetch users: ' + (error.response?.data || error.message));
+        toast.error(`Failed to fetch users: ${error.response?.data || error.message}`);
       } finally {
         setLoading(false);
       }
@@ -40,7 +43,9 @@ export const ViewAllUsers = () => {
       return;
     }
     try {
-      await axios.delete(`springbackend-production-93ac.up.railway.app:8080/api/users/admin/delete/${user.id}/${userId}`);
+      await axios.delete(`${config.url}/api/users/admin/delete/${user.id}/${userId}`, {
+        withCredentials: true,
+      });
       setUsers(users.filter((u) => u.id !== userId));
       toast.success('User deleted successfully');
     } catch (error) {

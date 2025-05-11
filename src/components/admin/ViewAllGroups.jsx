@@ -5,9 +5,12 @@ import toast from 'react-hot-toast';
 import { AdminNavbar } from './AdminNavbar';
 import { AuthContext } from '../../AuthContext';
 import { Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import config from '../../config';
 
 export const ViewAllGroups = () => {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,21 +23,25 @@ export const ViewAllGroups = () => {
 
     const fetchGroups = async () => {
       try {
-        const response = await axios.get('springbackend-production-93ac.up.railway.app:8080/api/groups/viewall');
+        const response = await axios.get(`${config.url}/api/groups/viewall`, {
+          withCredentials: true,
+        });
         setGroups(response.data);
       } catch (error) {
-        toast.error('Failed to fetch groups: ' + (error.response?.data || error.message));
+        toast.error(`Failed to fetch groups: ${error.response?.data || error.message}`);
       } finally {
         setLoading(false);
       }
     };
     fetchGroups();
-  }, [user]);
+  }, [user, navigate]);
 
   const handleDeleteGroup = async (groupId) => {
     if (!window.confirm('Are you sure you want to delete this group?')) return;
     try {
-      await axios.delete(`springbackend-production-93ac.up.railway.app:8080/api/groups/admin/delete/${user.id}/${groupId}`);
+      await axios.delete(`${config.url}/api/groups/admin/delete/${user.id}/${groupId}`, {
+        withCredentials: true,
+      });
       setGroups(groups.filter((group) => group.id !== groupId));
       toast.success('Group deleted successfully');
     } catch (error) {

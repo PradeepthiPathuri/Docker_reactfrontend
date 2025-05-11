@@ -10,6 +10,7 @@ import { Stomp } from '@stomp/stompjs';
 import { AuthContext } from '../AuthContext';
 import Modal from 'react-modal';
 import { Menu, MenuItem, MenuButton, MenuItems } from '@headlessui/react';
+import config from '../config'; // Adjust path as needed
 
 Modal.setAppElement('#root');
 
@@ -39,8 +40,8 @@ const ChatRoom = () => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  const API_BASE_URL = 'springbackend-production-93ac.up.railway.app:8080/api';
-  const WS_URL = 'springbackend-production-93ac.up.railway.app:8080/ws';
+  const API_BASE_URL = `${config.url}/api`;
+  const WS_URL = `${config.url}/ws`;
   const emojis = ['😀', '😂', '😍', '👍', '🔥', '❤️', '💯', '🎉', '👋', '🤓'];
   const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
@@ -308,8 +309,8 @@ const ChatRoom = () => {
         });
 
         console.log('Upload response data:', JSON.stringify(uploadResponse.data, null, 2));
-        const fileEntity = uploadResponse.data; // Expecting FileEntity with id or fileId
-        const fileId = fileEntity?.id || fileEntity?.fileId; // Check for id or fileId
+        const fileEntity = uploadResponse.data;
+        const fileId = fileEntity?.id || fileEntity?.fileId;
         const fileName = fileEntity?.fileName || file.name;
 
         if (!fileId) {
@@ -319,11 +320,9 @@ const ChatRoom = () => {
           console.log('File uploaded to drive, received fileId:', fileId);
         }
 
-        // Save the file to all group members' drives
         for (const member of members) {
           if (member !== user.username) {
             try {
-              // Fetch user ID for the member
               const usersResponse = await axios.get(`${API_BASE_URL}/users/viewall`);
               const memberUser = usersResponse.data.find((u) => u.username === member);
               if (memberUser) {
@@ -350,7 +349,6 @@ const ChatRoom = () => {
           }
         }
 
-        // Send chat message only if fileId is available
         if (fileId) {
           const tempId = `temp-file-${Date.now()}`;
           const tempMessage = {

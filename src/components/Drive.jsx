@@ -50,6 +50,7 @@ export const Drive = () => {
   const [viewingFile, setViewingFile] = useState(null);
   const docxPreviewRef = useRef(null);
   const prevActiveTabRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!user) {
@@ -63,6 +64,16 @@ export const Drive = () => {
       prevActiveTabRef.current = activeTab;
     }
   }, [activeTab, user]);
+
+  useEffect(() => {
+    return () => {
+      files.forEach((file) => {
+        if (file.previewUrl) {
+          window.URL.revokeObjectURL(file.previewUrl);
+        }
+      });
+    };
+  }, [files]);
 
   const fetchFiles = async () => {
     if (!user?.username) {
@@ -84,32 +95,52 @@ export const Drive = () => {
       const response = await axios.get(url);
       const fetchedFiles = Array.isArray(response.data) ? response.data : [];
 
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(async (entry) => {
+            if (entry.isIntersecting) {
+              const file = JSON.parse(entry.target.dataset.file);
+              if (['png', 'jpg', 'jpeg'].includes(file.extension) && !file.previewUrl) {
+                const response = await axios.get(`${config.url}/api/file/download/${file.id}`, {
+                  responseType: 'blob',
+                });
+                const previewUrl = window.URL.createObjectURL(new Blob([response.data]));
+                setFiles((prev) =>
+                  prev.map((f) => (f.id === file.id ? { ...f, previewUrl } : f))
+                );
+              }
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+
       const transformedFiles = await Promise.all(
         fetchedFiles.map(async (file) => {
-          const fileExtension = file.fileName.split('.').pop().toLowerCase();
-          let previewUrl = null;
-
-          if (['png', 'jpg', 'jpeg'].includes(fileExtension)) {
-            const response = await axios.get(`${config.url}/api/file/download/${file.id}`, {
-              responseType: 'blob',
-            });
-            previewUrl = window.URL.createObjectURL(new Blob([response.data]));
-          }
-
+          const fileExtension = file.fileName?.split('.').pop()?.toLowerCase() || '';
           return {
             id: file.id,
-            name: file.fileName,
-            type: 'file',
+            name: file.fileName || file.name,
+            type: file.isFolder ? 'folder' : 'file',
             size: file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '-',
             date: file.uploadDate || new Date().toISOString().split('T')[0],
-            isFavourite: file.isFavourite,
-            previewUrl,
+            isFavourite: file.isFavourite || false,
+            previewUrl: null,
             extension: fileExtension,
           };
         })
       );
 
       setFiles(activeTab === 'recents' ? transformedFiles.slice(-3) : transformedFiles);
+
+      transformedFiles.forEach((file) => {
+        const element = document.querySelector(`[data-file-id="${file.id}"]`);
+        if (element) {
+          element.dataset.file = JSON.stringify(file);
+          observer.observe(element);
+        }
+      });
     } catch (error) {
       toast.error('Failed to load files: ' + (error.response?.data?.message || error.message));
     } finally {
@@ -123,6 +154,24 @@ export const Drive = () => {
 
     if (!user || !user.id) {
       toast.error('User not authenticated. Please log in.');
+      return;
+    }
+
+    const validTypes = [
+      'image/png',
+      'image/jpeg',
+      'application/pdf',
+      'video/mp4',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Unsupported file type. Please upload PNG, JPEG, PDF, MP4, or DOCX.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB.');
       return;
     }
 
@@ -297,6 +346,25 @@ export const Drive = () => {
     }
   };
 
+  const createFolder = async () => {
+    if (!folderName.trim()) {
+      toast.error('Please provide a folder name');
+      return;
+    }
+
+    try {
+      await axios.post(`${config.url}/api/folder/create/${user.id}`, {
+        name: folderName,
+      });
+      toast.success('Folder created successfully!');
+      setShowNewFolderModal(false);
+      setFolderName('');
+      await fetchFiles();
+    } catch (error) {
+      toast.error('Failed to create folder: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
   const handleItemClick = (file) => {
     setSelectedItem(selectedItem?.id === file.id ? null : file);
     setShowMenu(null);
@@ -309,7 +377,6 @@ export const Drive = () => {
 
   const handleAction = (action, file, e) => {
     e.stopPropagation();
-
     switch (action) {
       case 'download':
         handleDownload(file);
@@ -327,14 +394,6 @@ export const Drive = () => {
         break;
     }
     setShowMenu(null);
-  };
-
-  const createFolder = () => {
-    if (folderName) {
-      toast.success('Folder created successfully!');
-      setShowNewFolderModal(false);
-      setFolderName('');
-    }
   };
 
   const handleLogout = () => {
@@ -367,24 +426,27 @@ export const Drive = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="flex flex-col sm:flex-row h-[calc(100vh-8rem)] mt-20 bg-[#0A0A0A] rounded-lg overflow-hidden max-w-[95%] sm:max-w-7xl mx-auto px-2 sm:px-6"
+      role="main"
+      aria-label="File Drive"
     >
       {/* Sidebar */}
       <div className="w-full sm:w-64 bg-white/5 backdrop-blur-lg border-r border-white/10 p-2 sm:p-4">
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => document.getElementById('file-upload').click()}
+          onClick={() => fileInputRef.current?.click()}
           className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white mb-4 text-sm sm:text-base"
+          aria-label="Upload Files"
         >
           <Upload className="h-5 w-5" />
           <span>Upload Files</span>
         </motion.button>
         <input
           type="file"
-          id="file-upload"
-          multiple
+          ref={fileInputRef}
           className="hidden"
           onChange={handleFileUpload}
+          aria-label="File upload input"
         />
 
         <div className="space-y-1">
@@ -398,6 +460,7 @@ export const Drive = () => {
                   ? 'bg-blue-500/20 text-blue-500'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
+              aria-label={`Switch to ${item.label}`}
             >
               <item.icon className="h-5 w-5" />
               <span>{item.label}</span>
@@ -419,6 +482,7 @@ export const Drive = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-white/5 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-white placeholder-gray-400 text-sm"
+                  aria-label="Search files"
                 />
               </div>
             </div>
@@ -426,10 +490,14 @@ export const Drive = () => {
               <button
                 onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
                 className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                aria-label={`Switch to ${viewMode === 'grid' ? 'list' : 'grid'} view`}
               >
                 {viewMode === 'grid' ? <List className="h-5 w-5" /> : <Grid className="h-5 w-5" />}
               </button>
-              <button className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5">
+              <button
+                className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                aria-label="Filter files"
+              >
                 <Filter className="h-5 w-5" />
               </button>
               <motion.button
@@ -437,6 +505,7 @@ export const Drive = () => {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowNewFolderModal(true)}
                 className="flex items-center space-x-2 px-3 py-2 bg-white/10 rounded-lg text-white text-sm"
+                aria-label="Create new folder"
               >
                 <Plus className="h-5 w-5" />
                 <span>New Folder</span>
@@ -446,6 +515,7 @@ export const Drive = () => {
                 whileTap={{ scale: 0.95 }}
                 onClick={handleLogout}
                 className="flex items-center space-x-2 px-3 py-2 bg-red-600 rounded-lg text-white text-sm"
+                aria-label="Sign out"
               >
                 <span>Sign Out</span>
               </motion.button>
@@ -457,10 +527,18 @@ export const Drive = () => {
         <div className="flex-1 p-2 sm:p-6 overflow-auto">
           {loading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+              <div
+                className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full"
+                role="status"
+                aria-label="Loading files"
+              ></div>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-6' : 'space-y-2 sm:space-y-4'}>
+            <div
+              className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-6' : 'space-y-2 sm:space-y-4'}
+              role="list"
+              aria-label="File list"
+            >
               {files
                 .filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
                 .map((file) => (
@@ -475,6 +553,11 @@ export const Drive = () => {
                         ? 'bg-white/10 backdrop-blur-lg rounded-lg p-3 sm:p-4 relative'
                         : 'flex items-center justify-between bg-white/10 backdrop-blur-lg rounded-lg p-3 sm:p-4 relative'
                     } ${selectedItem?.id === file.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer`}
+                    role="listitem"
+                    data-file-id={file.id}
+                    tabIndex={0}
+                    onKeyPress={(e) => e.key === 'Enter' && handleItemClick(file)}
+                    aria-label={`File: ${file.name}`}
                   >
                     {viewMode === 'grid' ? (
                       <>
@@ -491,6 +574,7 @@ export const Drive = () => {
                                 <button
                                   onClick={(e) => toggleMenu(file.id, e)}
                                   className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 flex-shrink-0"
+                                  aria-label="More options"
                                 >
                                   <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                                 </button>
@@ -502,7 +586,10 @@ export const Drive = () => {
                         <div className="mt-2 sm:mt-4 flex items-center justify-between text-xs sm:text-sm text-gray-400">
                           <span>Modified {new Date(file.date).toLocaleDateString()}</span>
                           {file.type === 'folder' && (
-                            <button className="p-1 hover:text-white rounded-full hover:bg-white/5">
+                            <button
+                              className="p-1 hover:text-white rounded-full hover:bg-white/5"
+                              aria-label="Open folder"
+                            >
                               <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
                             </button>
                           )}
@@ -520,6 +607,7 @@ export const Drive = () => {
                             <button
                               onClick={(e) => handleAction('download', file, e)}
                               className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                              aria-label="Download file"
                             >
                               Download
                             </button>
@@ -529,6 +617,7 @@ export const Drive = () => {
                               <button
                                 onClick={(e) => handleAction('view', file, e)}
                                 className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                                aria-label="View file"
                               >
                                 View
                               </button>
@@ -536,12 +625,14 @@ export const Drive = () => {
                             <button
                               onClick={(e) => handleAction('favourite', file, e)}
                               className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                              aria-label={file.isFavourite ? 'Remove from Favorites' : 'Add to Favorites'}
                             >
                               {file.isFavourite ? 'Remove from Favorites' : 'Add to Favorites'}
                             </button>
                             <button
                               onClick={(e) => handleAction('delete', file, e)}
                               className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                              aria-label="Delete file"
                             >
                               Delete
                             </button>
@@ -562,6 +653,7 @@ export const Drive = () => {
                               <button
                                 onClick={(e) => toggleMenu(file.id, e)}
                                 className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 flex-shrink-0"
+                                aria-label="More options"
                               >
                                 <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                               </button>
@@ -577,6 +669,7 @@ export const Drive = () => {
                             <button
                               onClick={(e) => handleAction('download', file, e)}
                               className="p-1 sm:p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                              aria-label="Download file"
                             >
                               <Download className="h-4 w-4 sm:h-5 sm:w-5" />
                             </button>
@@ -586,6 +679,7 @@ export const Drive = () => {
                               <button
                                 onClick={(e) => handleAction('view', file, e)}
                                 className="p-1 sm:p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                                aria-label="View file"
                               >
                                 <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                               </button>
@@ -593,12 +687,14 @@ export const Drive = () => {
                             <button
                               onClick={(e) => handleAction('favourite', file, e)}
                               className="p-1 sm:p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                              aria-label={file.isFavourite ? 'Remove from Favorites' : 'Add to Favorites'}
                             >
                               <Star className={`h-4 w-4 sm:h-5 sm:w-5 ${file.isFavourite ? 'text-yellow-400' : ''}`} />
                             </button>
                             <button
                               onClick={(e) => handleAction('delete', file, e)}
                               className="p-1 sm:p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+                              aria-label="Delete file"
                             >
                               <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                             </button>
@@ -617,6 +713,7 @@ export const Drive = () => {
                             <button
                               onClick={(e) => handleAction('download', file, e)}
                               className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                              aria-label="Download file"
                             >
                               Download
                             </button>
@@ -626,6 +723,7 @@ export const Drive = () => {
                               <button
                                 onClick={(e) => handleAction('view', file, e)}
                                 className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                                aria-label="View file"
                               >
                                 View
                               </button>
@@ -633,12 +731,14 @@ export const Drive = () => {
                             <button
                               onClick={(e) => handleAction('favourite', file, e)}
                               className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                              aria-label={file.isFavourite ? 'Remove from Favorites' : 'Add to Favorites'}
                             >
                               {file.isFavourite ? 'Remove from Favorites' : 'Add to Favorites'}
                             </button>
                             <button
                               onClick={(e) => handleAction('delete', file, e)}
                               className="block w-full text-left px-3 py-2 text-gray-300 hover:bg-white/10 text-sm"
+                              aria-label="Delete file"
                             >
                               Delete
                             </button>
@@ -659,24 +759,30 @@ export const Drive = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+          role="dialog"
+          aria-labelledby="new-folder-modal-title"
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="bg-[#0A0A0A] rounded-lg p-3 sm:p-6 w-full max-w-[95%] sm:max-w-md"
           >
-            <h2 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">Create New Folder</h2>
+            <h2 id="new-folder-modal-title" className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">
+              Create New Folder
+            </h2>
             <input
               type="text"
               placeholder="Folder name"
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
               className="w-full bg-white/5 border border-gray-700 rounded-lg py-2 px-3 text-white placeholder-gray-400 text-sm sm:text-base mb-3 sm:mb-4"
+              aria-label="Folder name"
             />
             <div className="flex justify-end space-x-2 sm:space-x-3">
               <button
                 onClick={() => setShowNewFolderModal(false)}
                 className="px-3 py-2 text-gray-400 hover:text-white text-sm"
+                aria-label="Cancel"
               >
                 Cancel
               </button>
@@ -685,6 +791,7 @@ export const Drive = () => {
                 whileTap={{ scale: 0.95 }}
                 onClick={createFolder}
                 className="px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white text-sm"
+                aria-label="Create folder"
               >
                 Create
               </motion.button>
@@ -699,6 +806,8 @@ export const Drive = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4"
+          role="dialog"
+          aria-labelledby="file-viewer-modal-title"
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -706,12 +815,13 @@ export const Drive = () => {
             className="bg-[#0A0A0A] rounded-lg p-4 sm:p-6 w-full max-w-[95%] sm:max-w-7xl max-h-[100vh] flex flex-col"
           >
             <div className="flex justify-between items-center mb-3 sm:mb-4">
-              <h2 className="text-lg sm:text-2xl font-bold text-white truncate max-w-[80%]">
+              <h2 id="file-viewer-modal-title" className="text-lg sm:text-2xl font-bold text-white truncate max-w-[80%]">
                 {viewingFile.name}
               </h2>
               <button
                 onClick={() => setViewingFile(null)}
                 className="text-gray-400 hover:text-white text-sm sm:text-base"
+                aria-label="Close file viewer"
               >
                 Close
               </button>
@@ -756,6 +866,7 @@ export const Drive = () => {
                     href={viewingFile.url}
                     download={viewingFile.name}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base"
+                    aria-label={`Download ${viewingFile.name}`}
                   >
                     Download {viewingFile.name}
                   </a>

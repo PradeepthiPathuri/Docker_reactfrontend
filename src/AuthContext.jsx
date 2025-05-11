@@ -1,22 +1,35 @@
-import React, { createContext, useState } from 'react';
+import { createContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
-  const login = (userData) => {
-    if (!userData || !userData.id || !userData.username) {
-      console.error('Invalid user data provided to login:', userData);
-      return;
+  useEffect(() => {
+    // Initialize user from localStorage
+    const authSession = localStorage.getItem('authSession');
+    if (authSession) {
+      const parsedSession = JSON.parse(authSession);
+      const storedUser = parsedSession?.user;
+      if (storedUser) {
+        setUser({
+          id: storedUser.id,
+          username: storedUser.username,
+          email: storedUser.email,
+          isAdmin: storedUser.isAdmin || false, // Default to false if not present
+        });
+      }
     }
-    console.log('AuthContext login:', userData); // Debug
-    setUser(userData); // Expecting { id, username, isAdmin }
+  }, []);
+
+  const login = (userData) => {
+    setUser(userData);
+    localStorage.setItem('authSession', JSON.stringify({ user: userData }));
   };
 
   const logout = () => {
-    console.log('Logging out'); // Debug
     setUser(null);
+    localStorage.removeItem('authSession');
   };
 
   return (

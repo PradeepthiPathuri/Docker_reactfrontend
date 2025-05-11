@@ -5,6 +5,7 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { AuthContext } from '../../AuthContext';
+import config from '../../config'; // Adjust path as needed
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -21,13 +22,13 @@ export const Login = () => {
     const generateCode = () => {
       const code = Math.floor(100 + Math.random() * 900).toString();
       setCaptchaCode(code);
-      console.log('Generated CAPTCHA:', code); // Debug
+      console.log('Generated CAPTCHA:', code);
     };
     generateCode();
   }, []);
 
   const verifyCaptcha = () => {
-    console.log('Verifying CAPTCHA:', { input: captchaInput, code: captchaCode }); // Debug
+    console.log('Verifying CAPTCHA:', { input: captchaInput, code: captchaCode });
     if (captchaInput === captchaCode) {
       setCaptchaVerified(true);
       toast.success('CAPTCHA verified!');
@@ -53,37 +54,35 @@ export const Login = () => {
         email: isEmail ? email : null,
         password: password,
       };
-      console.log('Sending login request:', loginData); // Debug
+      console.log('Sending login request:', loginData);
 
-      const response = await axios.post('springbackend-production-93ac.up.railway.app:8080:8080/api/users/login', loginData, {
+      const response = await axios.post(`${config.url}/api/users/login`, loginData, {
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
       const user = response.data;
-      console.log('Login response:', user); // Debug
+      console.log('Login response:', user);
 
       if (user && user.id && user.username) {
-        // Update AuthContext with user data
         const userData = { id: user.id, username: user.username, isAdmin: user.admin };
-        console.log('Calling login with:', userData); z
+        console.log('Calling login with:', userData);
         login(userData);
         toast.success('Login successful');
 
-        // Navigate based on admin field from backend response
         if (user.admin) {
-          console.log('Navigating to /admin-dashboard'); // Debug
+          console.log('Navigating to /admin-dashboard');
           navigate('/admin-dashboard', { replace: true });
         } else {
-          console.log('Navigating to /pass-share'); // Debug
+          console.log('Navigating to /pass-share');
           navigate('/pass-share', { replace: true });
         }
       } else {
         throw new Error('Invalid user data received');
       }
     } catch (error) {
-      console.error('Login error:', error); // Debug
+      console.error('Login error:', error);
       const errorMessage =
         error.response?.data ||
         error.response?.data?.message ||
@@ -146,7 +145,6 @@ export const Login = () => {
               </div>
             </div>
 
-            {/* CAPTCHA Section */}
             <div className="space-y-3">
               <div className="text-center">
                 <p className="text-gray-400 mb-2 text-sm sm:text-base">Verify you're not a bot</p>

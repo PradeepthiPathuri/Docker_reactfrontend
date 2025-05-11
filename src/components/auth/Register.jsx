@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import config from '../../config'; // Adjust path as needed
 
 export const Register = () => {
   const navigate = useNavigate();
@@ -30,20 +31,21 @@ export const Register = () => {
         return;
       }
 
-      const response = await axios.post('http://localhost:8080/api/users/add', {
+      const response = await axios.post(`${config.url}/api/users/add`, {
         username: formData.username,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
       });
 
       toast.success('Registration successful! Please login.');
       navigate('/login');
     } catch (error) {
-      const errorMessage = error.response?.data || 
-                         error.response?.data?.message || 
-                         error.message || 
-                         'An error occurred';
-      
+      const errorMessage =
+        error.response?.data ||
+        error.response?.data?.message ||
+        error.message ||
+        'An error occurred';
+
       if (error.response?.status === 409) {
         if (errorMessage === 'Username already taken') {
           toast.error('Username is already taken');

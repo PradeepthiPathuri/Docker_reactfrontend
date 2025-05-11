@@ -21,6 +21,7 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { themes } from './lib/themes';
 import { AuthProvider, AuthContext } from './AuthContext.jsx';
 import ComingSoon from './components/ComingSoon.jsx';
+import { Dashboard } from './components/Dashboard.jsx';
 
 // Protected route for admin-only access
 const ProtectedAdminRoute = ({ element }) => {
@@ -55,7 +56,7 @@ const AppRoutes = () => {
               {user?.isAdmin ? <AdminNavbar /> : <Navbar />}
               <main className="flex-1 overflow-auto px-4 container mx-auto py-2">
                 <Routes>
-                  <Route path="/dashboard" element={<ComingSoon />} />
+                  <Route path="/dashboard" element={<Dashboard/>} />
                   <Route path="/admin-dashboard" element={<ProtectedAdminRoute element={<AdminDashboard />} />} />
                   <Route path="/pass-share" element={<PassShare />} />
                   <Route path="/nearby" element={<ComingSoon />} />

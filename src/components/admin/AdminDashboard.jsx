@@ -6,6 +6,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { AdminNavbar } from './AdminNavbar';
 import { AuthContext } from '../../AuthContext';
+import config from '../../config';
 
 export const AdminDashboard = () => {
   const { user } = useContext(AuthContext);
@@ -25,11 +26,14 @@ export const AdminDashboard = () => {
 
     const fetchData = async () => {
       try {
-        
-        const usersResponse = await axios.get('springbackend-production-93ac.up.railway.app:8080/api/users/viewall');
+        const usersResponse = await axios.get(`${config.url}/api/users/viewall`, {
+          withCredentials: true,
+        });
         const users = usersResponse.data;
 
-        const groupsResponse = await axios.get('springbackend-production-93ac.up.railway.app:8080/api/groups/viewall');
+        const groupsResponse = await axios.get(`${config.url}/api/groups/viewall`, {
+          withCredentials: true,
+        });
         const groups = groupsResponse.data;
 
         setStats({
@@ -38,7 +42,7 @@ export const AdminDashboard = () => {
         });
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
-        toast.error('Failed to fetch dashboard data');
+        toast.error(`Failed to fetch dashboard data: ${error.response?.data || error.message}`);
       } finally {
         setLoading(false);
       }
@@ -60,7 +64,6 @@ export const AdminDashboard = () => {
         animate={{ opacity: 1, y: 0 }}
         className="pt-16 sm:pt-20 pb-6 sm:pb-8 max-w-[90%] sm:max-w-7xl mx-auto space-y-6 sm:space-y-8"
       >
-        
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           {[
             { title: 'Total Users', value: loading ? 'Loading...' : stats.totalUsers },

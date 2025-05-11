@@ -1,24 +1,13 @@
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Camera, Mail, Lock, Bell, Shield, Download, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import config from '../config.js';
-
-
-const initializeAuthSession = () => {
-  const authSession = {
-    user: {
-      id: 4,
-      username: 'Rohith',
-      email: 'rohithvema09@gmail.com',
-    },
-  };
-  localStorage.setItem('authSession', JSON.stringify(authSession));
-};
-
-initializeAuthSession();
+import { AuthContext } from '../AuthContext.jsx';
+import axios from 'axios';
 
 export const Profile = () => {
+  const { user } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('general');
   const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState({
@@ -33,49 +22,23 @@ export const Profile = () => {
     confirmNewPassword: '',
   });
 
-  const authSession = localStorage.getItem('authSession');
-  const userId = authSession ? JSON.parse(authSession)?.user?.id : null;
-
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!userId) {
-        console.error('No user session found');
+      if (!user || !user.id) {
+        toast.error('Please log in to view your profile');
         return;
       }
 
       try {
-        const userResponse = await fetch(`${config.url}/api/users/view/${userId}`, {
-          credentials: 'include',
+        // Fetch user profile data from backend
+        const userResponse = await axios.get(`${config.url}/api/users/profile/${user.id}`, {
+          withCredentials: true,
         });
+        const { username, email } = userResponse.data;
 
-        console.log('API Response Status:', userResponse.status);
-        console.log('API Response Headers:', userResponse.headers.get('Content-Type'));
-
-        if (!userResponse.ok) {
-          const errorText = await userResponse.text();
-          throw new Error(`HTTP error: ${userResponse.status} ${userResponse.statusText} - ${errorText}`);
-        }
-
-        const contentType = userResponse.headers.get('Content-Type');
-        if (!contentType || !contentType.includes('application/json')) {
-          const text = await userResponse.text();
-          throw new Error(`Expected JSON, got ${contentType}: ${text}`);
-        }
-
-        const text = await userResponse.text();
-        if (!text) {
-          throw new Error('Empty response from server');
-        }
-
-        let user;
-        try {
-          user = JSON.parse(text);
-        } catch (jsonError) {
-          throw new Error(`Invalid JSON: ${jsonError.message} - Response: ${text}`);
-        }
-
+        // Fetch profile picture
         let avatar = null;
-        const pictureResponse = await fetch(`${config.url}/api/users/profile-picture/${userId}`, {
+        const pictureResponse = await fetch(`${config.url}/api/users/profile-picture/${user.id}`, {
           credentials: 'include',
         });
         if (pictureResponse.ok) {
@@ -86,26 +49,14 @@ export const Profile = () => {
         }
 
         setUserData({
-          username: user.username || 'N/A',
-          email: user.email || 'N/A',
+          username: username || user.username || 'N/A',
+          email: email || 'N/A',
           avatar,
-          userId,
+          userId: user.id,
         });
       } catch (error) {
         console.error('Error fetching user data:', error);
-
-        try {
-          const session = JSON.parse(authSession);
-          setUserData({
-            username: session.user.username || 'N/A',
-            email: session.user.email || 'N/A',
-            avatar: null,
-            userId,
-          });
-          console.log('Using local session data due to API failure');
-        } catch (fallbackError) {
-          console.error('Error parsing localStorage:', fallbackError);
-        }
+        toast.error(`Failed to load profile data: ${error.response?.data?.message || error.message}`);
       }
     };
 
@@ -116,23 +67,23 @@ export const Profile = () => {
         URL.revokeObjectURL(userData.avatar);
       }
     };
-  }, [userId, authSession]);
+  }, [user]);
 
   const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) {
-      console.error('No file selected');
+      toast.error('No file selected');
       return;
     }
 
     const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
     if (!validTypes.includes(file.type)) {
-      console.error('Please upload a valid image (JPEG, PNG, or GIF)');
+      toast.error('Please upload a valid image (JPEG, PNG, or GIF)');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      console.error('Profile picture must be less than 5MB');
+      toast.error('Profile picture must be less than 5MB');
       return;
     }
 
@@ -140,7 +91,7 @@ export const Profile = () => {
     formData.append('profilePicture', file);
 
     try {
-      const response = await fetch(`${config.url}/api/users/update-profile-picture/${userId}`, {
+      const response = await fetch(`${config.url}/api/users/update-profile-picture/${userData.userId}`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -151,15 +102,15 @@ export const Profile = () => {
         throw new Error(errorText || 'Failed to upload profile picture');
       }
 
-      const pictureResponse = await fetch(`${config.url}/api/users/profile-picture/${userId}`, {
+      if (userData.avatar) {
+        URL.revokeObjectURL(userData.avatar);
+      }
+
+      const pictureResponse = await fetch(`${config.url}/api/users/profile-picture/${userData.userId}`, {
         credentials: 'include',
       });
       if (!pictureResponse.ok) {
         throw new Error('Failed to fetch updated profile picture');
-      }
-
-      if (userData.avatar) {
-        URL.revokeObjectURL(userData.avatar);
       }
 
       const blob = await pictureResponse.blob();
@@ -172,10 +123,16 @@ export const Profile = () => {
       toast.success('Profile picture updated successfully!');
     } catch (error) {
       console.error('Error uploading profile picture:', error);
+      toast.error(`Failed to update profile picture: ${error.message}`);
     }
   };
 
   const handleSave = async () => {
+    if (!userData.username.trim() || !userData.email.trim()) {
+      toast.error('Username and email cannot be empty');
+      return;
+    }
+
     try {
       const response = await fetch(`${config.url}/api/users/update`, {
         method: 'PUT',
@@ -183,7 +140,7 @@ export const Profile = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: userId,
+          id: userData.userId,
           username: userData.username,
           email: userData.email,
         }),
@@ -202,21 +159,45 @@ export const Profile = () => {
         throw new Error(errorText || 'Failed to update profile');
       }
 
-      const updatedSession = JSON.parse(authSession);
-      updatedSession.user.username = userData.username;
-      updatedSession.user.email = userData.email;
-      localStorage.setItem('authSession', JSON.stringify(updatedSession));
+      // Update AuthContext and localStorage
+      const authSession = JSON.parse(localStorage.getItem('authSession') || '{}');
+      const updatedUser = {
+        ...authSession.user,
+        username: userData.username,
+        email: userData.email,
+      };
+      localStorage.setItem('authSession', JSON.stringify({ user: updatedUser }));
 
       setIsEditing(false);
       toast.success('Profile updated successfully!');
     } catch (error) {
       console.error('Error saving profile:', error);
+      toast.error(`Failed to save profile changes: ${error.message}`);
     }
   };
 
   const handlePasswordUpdate = async () => {
+    // Validate password fields
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmNewPassword) {
+      toast.error('All password fields are required');
+      return;
+    }
+
     if (passwordData.newPassword !== passwordData.confirmNewPassword) {
-      console.error('New password and confirmation do not match');
+      toast.error('New password and confirmation do not match');
+      return;
+    }
+
+    // Basic password strength validation
+    const minLength = 8;
+    const hasNumber = /\d/;
+    const hasSpecialChar = /[!@#$%^&*]/;
+    if (
+      passwordData.newPassword.length < minLength ||
+      !hasNumber.test(passwordData.newPassword) ||
+      !hasSpecialChar.test(passwordData.newPassword)
+    ) {
+      toast.error('New password must be at least 8 characters, include a number, and a special character');
       return;
     }
 
@@ -227,7 +208,7 @@ export const Profile = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId,
+          userId: userData.userId,
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword,
         }),
@@ -247,6 +228,7 @@ export const Profile = () => {
       });
     } catch (error) {
       console.error('Error updating password:', error);
+      toast.error(`Failed to update password: ${error.message}`);
     }
   };
 
@@ -268,6 +250,8 @@ export const Profile = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="max-w-4xl mx-auto mt-20 p-6"
+      role="main"
+      aria-label="User Profile"
     >
       <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 mb-6">
         <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
@@ -283,10 +267,12 @@ export const Profile = () => {
               onChange={handleImageUpload}
               className="hidden"
               id="profile-pic-upload"
+              aria-label="Upload profile picture"
             />
             <label
               htmlFor="profile-pic-upload"
               className="absolute bottom-0 right-0 p-2 bg-blue-500 rounded-full text-white hover:bg-blue-600 transition-colors cursor-pointer"
+              aria-label="Change profile picture"
             >
               <Camera className="h-4 w-4" />
             </label>
@@ -306,6 +292,7 @@ export const Profile = () => {
               }
             }}
             className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white"
+            aria-label={isEditing ? 'Save profile changes' : 'Edit profile'}
           >
             {isEditing ? 'Save Changes' : 'Edit Profile'}
           </motion.button>
@@ -334,6 +321,9 @@ export const Profile = () => {
                   ? 'bg-blue-500/20 text-blue-500 border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
+              aria-label={`Switch to ${tab.label} tab`}
+              aria-selected={activeTab === tab.id}
+              role="tab"
             >
               <tab.icon className="h-5 w-5" />
               <span>{tab.label}</span>
@@ -341,31 +331,38 @@ export const Profile = () => {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-6" role="tabpanel" aria-labelledby={`${activeTab}-tab`}>
           {activeTab === 'general' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
+                <label
+                  htmlFor="username"
+                  className="block text-sm font-medium text-gray-400 mb-2"
+                >
                   Username
                 </label>
                 <input
+                  id="username"
                   type="text"
                   value={userData.username || ''}
                   onChange={(e) => setUserData({ ...userData, username: e.target.value })}
                   disabled={!isEditing}
                   className="w-full bg-white/5 border border-gray-700 rounded-lg py-2 px-4 text-white"
+                  aria-label="Username"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-2">
                   Email
                 </label>
                 <input
+                  id="email"
                   type="email"
                   value={userData.email || ''}
                   onChange={(e) => setUserData({ ...userData, email: e.target.value })}
                   disabled={!isEditing}
                   className="w-full bg-white/5 border border-gray-700 rounded-lg py-2 px-4 text-white"
+                  aria-label="Email"
                 />
               </div>
               {isEditing && (
@@ -374,6 +371,7 @@ export const Profile = () => {
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSave}
                   className="w-full py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white mt-4"
+                  aria-label="Save profile changes"
                 >
                   Save Changes
                 </motion.button>
@@ -384,42 +382,57 @@ export const Profile = () => {
           {activeTab === 'security' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
+                <label
+                  htmlFor="current-password"
+                  className="block text-sm font-medium text-gray-400 mb-2"
+                >
                   Current Password
                 </label>
                 <input
+                  id="current-password"
                   type="password"
                   value={passwordData.currentPassword}
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, currentPassword: e.target.value })
                   }
                   className="w-full bg-white/5 border border-gray-700 rounded-lg py-2 px-4 text-white"
+                  aria-label="Current password"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
+                <label
+                  htmlFor="new-password"
+                  className="block text-sm font-medium text-gray-400 mb-2"
+                >
                   New Password
                 </label>
                 <input
+                  id="new-password"
                   type="password"
                   value={passwordData.newPassword}
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, newPassword: e.target.value })
                   }
                   className="w-full bg-white/5 border border-gray-700 rounded-lg py-2 px-4 text-white"
+                  aria-label="New password"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
+                <label
+                  htmlFor="confirm-password"
+                  className="block text-sm font-medium text-gray-400 mb-2"
+                >
                   Confirm New Password
                 </label>
                 <input
+                  id="confirm-password"
                   type="password"
                   value={passwordData.confirmNewPassword}
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })
                   }
                   className="w-full bg-white/5 border border-gray-700 rounded-lg py-2 px-4 text-white"
+                  aria-label="Confirm new password"
                 />
               </div>
               <motion.button
@@ -427,6 +440,7 @@ export const Profile = () => {
                 whileTap={{ scale: 0.98 }}
                 onClick={handlePasswordUpdate}
                 className="w-full py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white"
+                aria-label="Update password"
               >
                 Update Password
               </motion.button>
@@ -440,8 +454,16 @@ export const Profile = () => {
                   <h3 className="text-white font-medium">Email Notifications</h3>
                   <p className="text-sm text-gray-400">Receive email updates about your activity</p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                <label
+                  className="relative inline-flex items-center cursor-pointer"
+                  aria-label="Toggle email notifications"
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    defaultChecked
+                    aria-checked="true"
+                  />
                   <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
                 </label>
               </div>
@@ -455,7 +477,10 @@ export const Profile = () => {
                   <h3 className="text-white font-medium">Profile Visibility</h3>
                   <p className="text-sm text-gray-400">Control who can see your profile</p>
                 </div>
-                <select className="bg-white/5 border border-gray-700 rounded-lg py-2 px-4 text-white">
+                <select
+                  className="bg-white/5 border border-gray-700 rounded-lg py-2 px-4 text-white"
+                  aria-label="Profile visibility"
+                >
                   <option value="public">Public</option>
                   <option value="private">Private</option>
                   <option value="friends">Friends Only</option>
@@ -468,3 +493,5 @@ export const Profile = () => {
     </motion.div>
   );
 };
+
+export default Profile;

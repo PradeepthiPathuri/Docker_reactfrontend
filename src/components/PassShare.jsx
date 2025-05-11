@@ -1,39 +1,35 @@
 import { motion } from 'framer-motion';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { FileUp, Copy, Key, Upload, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import SockJS from 'sockjs-client';
 import Stomp from 'stompjs';
+import { AuthContext } from '../AuthContext';
+import config from '../config';
 
 const PassShare = () => {
+  const { user } = useContext(AuthContext);
   const [passkey, setPasskey] = useState('');
   const [joinPasskey, setJoinPasskey] = useState('');
   const [isInSession, setIsInSession] = useState(false);
   const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [downloadProgress, setDownloadProgress] = useState({});
   const fileInputRef = useRef(null);
   const stompClientRef = useRef(null);
-  const backendUrl = 'springbackend-production-93ac.up.railway.app:8080'; // Adjust if different
 
-  // Retrieve user from localStorage
-  const getUserFromLocalStorage = () => {
-    const authSession = localStorage.getItem('authSession');
-    if (authSession) {
-      try {
-        const parsed = JSON.parse(authSession);
-        return parsed.user || null;
-      } catch (error) {
-        console.error('Error parsing authSession:', error);
-        return null;
+  useEffect(() => {
+    return () => {
+      if (stompClientRef.current) {
+        stompClientRef.current.disconnect();
       }
-    }
-    return null;
-  };
+    };
+  }, []);
 
   const generatePasskey = async () => {
-    const user = getUserFromLocalStorage();
     if (!user || !user.username) {
       toast.error('Please log in to create a session');
       return;
@@ -48,7 +44,7 @@ const PassShare = () => {
     setPasskey(result);
 
     try {
-      await axios.post(`${backendUrl}/api/sessions/create`, {
+      await axios.post(`${config.url}/api/sessions/create`, {
         passkey: result,
         username: user.username,
       });
@@ -57,8 +53,7 @@ const PassShare = () => {
       connectWebSocket(result);
       fetchSessionFiles(result);
     } catch (error) {
-      console.error('Error creating session:', error);
-      toast.error(error.response?.data || 'Failed to create session');
+      toast.error('Failed to create session: ' + (error.response?.data?.message || error.message));
       setPasskey('');
     } finally {
       setIsLoading(false);
@@ -73,20 +68,19 @@ const PassShare = () => {
   };
 
   const handleJoin = async () => {
-    const user = getUserFromLocalStorage();
     if (!user || !user.username) {
       toast.error('Please log in to join a session');
       return;
     }
 
-    if (!joinPasskey) {
+    if (!joinPasskey.trim()) {
       toast.error('Please enter a passkey');
       return;
     }
 
     setIsLoading(true);
     try {
-      await axios.post(`${backendUrl}/api/sessions/join`, {
+      await axios.post(`${config.url}/api/sessions/join`, {
         passkey: joinPasskey,
         username: user.username,
       });
@@ -96,51 +90,86 @@ const PassShare = () => {
       connectWebSocket(joinPasskey);
       fetchSessionFiles(joinPasskey);
     } catch (error) {
-      console.error('Error joining session:', error);
-      toast.error(error.response?.data || 'Failed to join session');
+      toast.error('Failed to join session: ' + (error.response?.data?.message || error.message));
     } finally {
       setIsLoading(false);
+      setJoinPasskey('');
     }
   };
 
   const connectWebSocket = (passkey) => {
-    const socket = new SockJS(`${backendUrl}/ws`);
+    if (stompClientRef.current) {
+      stompClientRef.current.disconnect();
+    }
+
+    const socket = new SockJS(`${config.url}/ws`);
     const stompClient = Stomp.over(socket);
     stompClient.connect({}, () => {
       stompClient.subscribe(`/topic/session/${passkey}`, () => {
         fetchSessionFiles(passkey);
       });
+    }, () => {
+      setTimeout(() => connectWebSocket(passkey), 5000); // Reconnect on error
     });
     stompClientRef.current = stompClient;
   };
 
   const fetchSessionFiles = async (passkey) => {
     try {
-      const response = await axios.get(`${backendUrl}/api/sessions/files/${passkey}`);
+      const response = await axios.get(`${config.url}/api/sessions/files/${passkey}`);
       setFiles(response.data);
     } catch (error) {
-      console.error('Error fetching session files:', error);
-      toast.error(error.response?.data || 'Failed to fetch files');
+      toast.error('Failed to fetch files: ' + (error.response?.data?.message || error.message));
     }
   };
 
   const handleFileUpload = async (file) => {
-    const user = getUserFromLocalStorage();
     if (!user || !user.id) {
       toast.error('Please log in to upload files');
       return;
     }
 
+    const validTypes = [
+      'image/png',
+      'image/jpeg',
+      'application/pdf',
+      'video/mp4',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Unsupported file type. Please upload PNG, JPEG, PDF, MP4, or DOCX.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB.');
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    setUploadProgress((prev) => ({ ...prev, [tempId]: 0 }));
+
     const formData = new FormData();
     formData.append('file', file);
     try {
-      await axios.post(`${backendUrl}/api/sessions/upload/${passkey}/${user.id}`, formData, {
+      await axios.post(`${config.url}/api/sessions/upload/${passkey}/${user.id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress((prev) => ({ ...prev, [tempId]: percentCompleted }));
+        },
       });
       toast.success('File uploaded successfully');
+      fetchSessionFiles(passkey);
     } catch (error) {
-      console.error('Error uploading file:', error);
-      toast.error(error.response?.data || 'Failed to upload file');
+      toast.error('Failed to upload file: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setUploadProgress((prev) => {
+        const newProgress = { ...prev };
+        delete newProgress[tempId];
+        return newProgress;
+      });
     }
   };
 
@@ -159,9 +188,14 @@ const PassShare = () => {
   };
 
   const handleDownload = async (fileId, fileName) => {
+    setDownloadProgress((prev) => ({ ...prev, [fileId]: 0 }));
     try {
-      const response = await axios.get(`${backendUrl}/api/file/download/${fileId}`, {
+      const response = await axios.get(`${config.url}/api/file/download/${fileId}`, {
         responseType: 'blob',
+        onDownloadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setDownloadProgress((prev) => ({ ...prev, [fileId]: percentCompleted }));
+        },
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -170,19 +204,18 @@ const PassShare = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${fileName}`);
     } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error('Failed to download file');
+      toast.error('Failed to download file: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setDownloadProgress((prev) => {
+        const newProgress = { ...prev };
+        delete newProgress[fileId];
+        return newProgress;
+      });
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (stompClientRef.current) {
-        stompClientRef.current.disconnect();
-      }
-    };
-  }, []);
 
   if (isLoading) {
     return (
@@ -236,6 +269,8 @@ const PassShare = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-4xl mx-auto mt-20 p-6"
+        role="main"
+        aria-label="PassShare"
       >
         <div className="text-center mb-12">
           <motion.div
@@ -293,21 +328,28 @@ const PassShare = () => {
                   readOnly
                   placeholder="Generated passkey"
                   className="flex-1 p-2 bg-white/5 border border-gray-700 rounded-lg text-white placeholder-gray-400"
+                  aria-label="Generated passkey"
                 />
                 {passkey && (
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={copyPasskey}
                     className="p-2 text-blue-500 hover:bg-white/5 rounded-lg"
+                    aria-label="Copy passkey"
                   >
                     <Copy className="h-5 w-5" />
                   </motion.button>
                 )}
               </div>
               <motion.button
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={generatePasskey}
-                className="w-full py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300"
+                disabled={isLoading}
+                className={`w-full py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white font-medium ${
+                  isLoading ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
+                aria-label="Generate passkey"
               >
                 Generate Passkey
               </motion.button>
@@ -320,22 +362,26 @@ const PassShare = () => {
           >
             <h2 className="text-xl font-semibold mb-4 text-white">Join Share</h2>
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Key className="h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Enter passkey"
-                  className="flex-1 p-2 bg-white/5 border border-gray-700 rounded-lg text-white placeholder-gray-400"
-                  value={joinPasskey}
-                  onChange={(e) => setJoinPasskey(e.target.value)}
-                />
-              </div>
+              <input
+                type="text"
+                value={joinPasskey}
+                onChange={(e) => setJoinPasskey(e.target.value)}
+                placeholder="Enter passkey"
+                className="w-full p-2 bg-white/5 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                disabled={isLoading}
+                aria-label="Enter passkey"
+              />
               <motion.button
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleJoin}
-                className="w-full py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300"
+                disabled={isLoading}
+                className={`w-full py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white font-medium ${
+                  isLoading ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
+                aria-label="Join session"
               >
-                Join Share
+                Join Session
               </motion.button>
             </div>
           </motion.div>
@@ -349,73 +395,110 @@ const PassShare = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="max-w-4xl mx-auto mt-20 p-6"
+      role="main"
+      aria-label="PassShare Session"
     >
-      <div className="text-center mb-12">
-        <h1 className="text-3xl font-bold mb-2 text-white">File Sharing Session</h1>
-        <p className="text-gray-400">Passkey: {passkey}</p>
+      <div className="mb-12">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          className="inline-block p-4 bg-blue-500/20 backdrop-blur-lg rounded-full mb-4"
+        >
+          <Key className="h-12 w-12 text-blue-500" />
+        </motion.div>
+        <h1 className="text-3xl font-bold mb-2 text-white">Secure File Sharing Session</h1>
+        <div className="flex items-center space-x-2">
+          <p className="text-gray-400">Passkey: <span className="font-mono text-white">{passkey}</span></p>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={copyPasskey}
+            className="p-2 text-blue-500 hover:bg-white/5 rounded-lg"
+            aria-label="Copy passkey"
+          >
+            <Copy className="h-5 w-5" />
+          </motion.button>
+        </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        <motion.div
-          className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-lg"
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
+      <motion.div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        className={`border-2 border-dashed rounded-lg p-6 text-center mb-8 transition-colors ${
+          isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-gray-700 bg-white/5'
+        }`}
+        role="region"
+        aria-label="File upload area"
+      >
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+          className="hidden"
+          multiple
+          aria-label="File upload input"
+        />
+        <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+        <p className="text-white mb-2">Drag & drop files here</p>
+        <p className="text-gray-400 mb-4">or</p>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => fileInputRef.current?.click()}
+          className="px-4 py-2 bg-blue-500/20 rounded-lg text-blue-500 font-medium hover:bg-blue-500/30"
+          aria-label="Browse files"
         >
-          <h2 className="text-xl font-semibold mb-4 text-white">Upload Files</h2>
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center ${
-              isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-gray-700'
-            }`}
-          >
-            <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-            <p className="text-gray-400 mb-4">
-              Drag and drop files here or click to select
-            </p>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              multiple
-              className="hidden"
-            />
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => fileInputRef.current?.click()}
-              className="py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Select Files
-            </motion.button>
-          </div>
-        </motion.div>
+          Browse Files
+        </motion.button>
+      </motion.div>
 
-        <motion.div className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold mb-4 text-white">Shared Files</h2>
-          {files.length === 0 ? (
-            <p className="text-gray-400">No files shared yet</p>
-          ) : (
-            <ul className="space-y-2">
-              {files.map((file) => (
-                <li
-                  key={file.id}
-                  className="flex items-center justify-between p-2 bg-white/5 rounded-lg"
-                >
-                  <span className="text-white">{file.fileName}</span>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleDownload(file.id, file.fileName)}
-                    className="p-2 text-blue-500 hover:bg-white/10 rounded-lg"
-                  >
-                    <Download className="h-5 w-5" />
-                  </motion.button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </motion.div>
+      <div className="space-y-4" role="list" aria-label="Shared files">
+        {files.length === 0 && (
+          <p className="text-gray-400 text-center">No files shared yet.</p>
+        )}
+        {files.map((file) => (
+          <motion.div
+            key={file.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/10 backdrop-blur-lg rounded-lg p-4 flex items-center justify-between"
+            role="listitem"
+            aria-label={`File: ${file.fileName}`}
+          >
+            <div className="flex items-center space-x-3">
+              <FileUp className="h-6 w-6 text-blue-500" />
+              <div>
+                <h3 className="text-white font-medium">{file.fileName}</h3>
+                <p className="text-sm text-gray-400">
+                  {(file.size / 1024 / 1024).toFixed(1)} MB • Uploaded by {file.uploaderUsername}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              {(uploadProgress[file.id] > 0 || downloadProgress[file.id] > 0) && (
+                <div className="w-24 h-2 bg-gray-700 rounded">
+                  <div
+                    className="h-full bg-blue-500 rounded"
+                    style={{ width: `${uploadProgress[file.id] || downloadProgress[file.id] || 0}%` }}
+                  />
+                </div>
+              )}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleDownload(file.id, file.fileName)}
+                className="p-2 text-blue-500 hover:bg-white/5 rounded-lg"
+                aria-label={`Download ${file.fileName}`}
+              >
+                <Download className="h-5 w-5" />
+              </motion.button>
+            </div>
+          </motion.div>
+        ))}
       </div>
     </motion.div>
   );

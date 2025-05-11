@@ -1,6 +1,6 @@
 const config = 
 {
-    "url":"https://springbackend-production-9c63.up.railway.app:8080"
+    "url":"http://192.168.216.20:8080"
 }
 
 export default config

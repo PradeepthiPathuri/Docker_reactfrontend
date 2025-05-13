@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import config from '../../config'; // Adjust path as needed
+import config from '../../config';
 
 export const Register = () => {
   const navigate = useNavigate();

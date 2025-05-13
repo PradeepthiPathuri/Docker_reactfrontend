@@ -23,7 +23,6 @@ import { AuthProvider, AuthContext } from './AuthContext.jsx';
 import ComingSoon from './components/ComingSoon.jsx';
 import { Dashboard } from './components/Dashboard.jsx';
 
-// Protected route for admin-only access
 const ProtectedAdminRoute = ({ element }) => {
   const { user } = useContext(AuthContext);
   if (!user || !user.isAdmin) {
@@ -32,7 +31,7 @@ const ProtectedAdminRoute = ({ element }) => {
   return element;
 };
 
-// Moved logic here: now inside AuthProvider
+
 const AppRoutes = () => {
   const [theme, setTheme] = useState('default');
   const { user } = useContext(AuthContext);
@@ -42,13 +41,12 @@ const AppRoutes = () => {
   return (
     <div className={`min-h-screen ${currentTheme.background} flex flex-col`}>
       <Routes>
-        {/* Public Routes */}
+      
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
-        {/* Protected Routes with Navbar */}
         <Route
           path="/*"
           element={

@@ -25,7 +25,7 @@ export const Dashboard = () => {
       }
 
       try {
-        // Fetch user files
+   
         const filesResponse = await fetch(`${config.url}/api/file/viewall/${user.username}`, {
           credentials: 'include',
         });
@@ -35,7 +35,7 @@ export const Dashboard = () => {
         }
         const files = await filesResponse.json();
 
-        // Fetch user groups
+     
         const groupsResponse = await fetch(`${config.url}/api/groups/user/${user.username}`, {
           credentials: 'include',
         });
@@ -45,7 +45,7 @@ export const Dashboard = () => {
         }
         const groups = await groupsResponse.json();
 
-        // Calculate stats
+      
         const totalStorage = 60; // Assumed limit for storage used calculation
         const totalSizeBytes = files.reduce((sum, file) => sum + (file.size || 0), 0);
         const totalSizeGB = (totalSizeBytes / (1024 * 1024 * 1024)).toFixed(2); // Convert bytes to GB
@@ -57,14 +57,14 @@ export const Dashboard = () => {
           storageUsed: `${storageUsedPercent}%`,
         });
 
-        // Sort files by uploadDate
+   
         const sortedFiles = files
           .sort((a, b) => new Date(b.uploadDate || 0) - new Date(a.uploadDate || 0))
           .slice(0, 3)
           .map((file) => ({
             id: file.id,
             name: file.fileName,
-            type: 'file', // Simplify for UI
+            type: 'file', 
             date: formatDate(file.uploadDate),
           }));
 
@@ -84,7 +84,6 @@ export const Dashboard = () => {
     fetchDashboardData();
   }, [user]);
 
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
@@ -119,7 +118,7 @@ export const Dashboard = () => {
       animate={{ opacity: 1, y: 0 }}
       className="pt-16 sm:pt-20 pb-6 sm:pb-8 max-w-[90%] sm:max-w-7xl mx-auto space-y-6 sm:space-y-8"
     >
-      {/* Stats Section */}
+   
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {Object.entries(stats).map(([key, value], index) => (
           <motion.div
@@ -155,9 +154,8 @@ export const Dashboard = () => {
         ))}
       </div>
 
-      {/* Quick Actions and My Drive Files */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Quick Actions */}
+
         <motion.div
           whileHover={{ y: -2 }}
           className="bg-white/10 backdrop-blur-lg rounded-lg p-4 sm:p-6"
@@ -183,7 +181,6 @@ export const Dashboard = () => {
           </div>
         </motion.div>
 
-        {/* My Drive Files */}
         <motion.div
           whileHover={{ y: -2 }}
           className="bg-white/10 backdrop-blur-lg rounded-lg p-4 sm:p-6 lg:col-span-2"

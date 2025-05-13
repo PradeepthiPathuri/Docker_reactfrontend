@@ -10,7 +10,7 @@ import { Stomp } from '@stomp/stompjs';
 import { AuthContext } from '../AuthContext';
 import Modal from 'react-modal';
 import { Menu, MenuItem, MenuButton, MenuItems } from '@headlessui/react';
-import config from '../config'; // Adjust path as needed
+import config from '../config';
 
 Modal.setAppElement('#root');
 

@@ -5,7 +5,7 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { AuthContext } from '../../AuthContext';
-import config from '../../config'; // Adjust path as needed
+import config from '../../config';
 
 export const Login = () => {
   const navigate = useNavigate();

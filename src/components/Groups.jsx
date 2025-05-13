@@ -22,7 +22,7 @@ export const Groups = () => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const stompClientRef = useRef(null);
-  const isConnectedRef = useRef(false); // Track connection status
+  const isConnectedRef = useRef(false); 
 
   useEffect(() => {
     if (!user) {
@@ -34,7 +34,7 @@ export const Groups = () => {
     connectWebSocket();
 
     return () => {
-      // Only disconnect if the connection is established
+    
       if (stompClientRef.current && isConnectedRef.current) {
         try {
           stompClientRef.current.disconnect(() => {
@@ -64,7 +64,7 @@ export const Groups = () => {
       (error) => {
         console.error('WebSocket connection error:', error);
         isConnectedRef.current = false;
-        // Attempt reconnection after 5 seconds
+     
         setTimeout(connectWebSocket, 5000);
       }
     );

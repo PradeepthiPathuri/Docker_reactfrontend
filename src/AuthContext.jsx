@@ -6,7 +6,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Initialize user from localStorage
     const authSession = localStorage.getItem('authSession');
     if (authSession) {
       const parsedSession = JSON.parse(authSession);
@@ -16,7 +15,7 @@ export const AuthProvider = ({ children }) => {
           id: storedUser.id,
           username: storedUser.username,
           email: storedUser.email,
-          isAdmin: storedUser.isAdmin || false, // Default to false if not present
+          isAdmin: storedUser.isAdmin || false,
         });
       }
     }

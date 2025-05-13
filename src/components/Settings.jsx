@@ -36,7 +36,7 @@ export const Settings = ({ setTheme }) => {
       <h1 className="text-3xl font-bold mb-8 text-white">Settings</h1>
 
       <div className="space-y-8">
-        {/* Speed Controls */}
+    
         <div className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-lg">
           <h2 className="text-xl font-semibold mb-4 text-white">Transfer Controls</h2>
           
@@ -85,7 +85,7 @@ export const Settings = ({ setTheme }) => {
           </div>
         </div>
 
-        {/* Theme Selection */}
+     
         <div className="bg-white/10 backdrop-blur-lg p-6 rounded-lg shadow-lg">
           <h2 className="text-xl font-semibold mb-4 text-white">Theme Selection</h2>
           <div className="relative">
@@ -125,7 +125,6 @@ export const Settings = ({ setTheme }) => {
         </div>
       </div>
 
-      {/* Premium Popup (Disney+ Hotstar style) */}
       {showPremium && (
         <motion.div
           initial={{ opacity: 0 }}

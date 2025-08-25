@@ -1,6 +1,6 @@
 const config = 
 {
-    "url":"https://ninth-botany-459617-a6.as.r.appspot.com"
+    "url":"https://springbackend-swiftyy.onrender.com"
 }
 
 export default config

@@ -108,7 +108,7 @@ export const Login = () => {
             className="text-center mb-6 sm:mb-8"
           >
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-2">Welcome Back</h1>
-            <p className="text-gray-400 text-sm sm:text-base">Sign in to continue sharing files</p>
+            <p className="text-gray-400 text-sm sm:text-base">Sign in to continue sharing files system</p>
           </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">

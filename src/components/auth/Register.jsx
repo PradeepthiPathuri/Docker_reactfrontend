@@ -142,9 +142,9 @@ export const Register = () => {
           </form>
 
           <div className="mt-6 text-center text-gray-400">
-            Already have an account?{' '}
+            Already have an account???{' '}
             <Link to="/login" className="text-blue-500 hover:text-blue-400">
-              Sign innn
+              Sign innnn
             </Link>
           </div>
         </div>
